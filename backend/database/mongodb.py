@@ -36,9 +36,55 @@ async def connect_to_mongo():
         if "diet_plans" not in await db.list_collection_names():
             await db.create_collection("diet_plans")
 
+        # Create conversation collections
+        await create_conversation_collections()
+
     except Exception as e:
         print(f"Error connecting to MongoDB: {e}")
         raise
+
+
+async def save_conversation(collection_name, user_id, conversation_data):
+    """Save a conversation entry to the specified collection."""
+    try:
+        conversation_record = {
+            "user_id": user_id,
+            "timestamp": conversation_data.get("timestamp"),
+            "query": conversation_data.get("query"),
+            "response": conversation_data.get("response"),
+            "metadata": conversation_data.get("metadata", {})
+        }
+        result = await db[collection_name].insert_one(conversation_record)
+        return str(result.inserted_id)
+    except Exception as e:
+        print(f"Error saving conversation to {collection_name}: {e}")
+        raise
+
+
+async def get_user_conversations(collection_name, user_id, limit=10):
+    """Retrieve conversation history for a specific user from the specified collection."""
+    try:
+        cursor = db[collection_name].find({"user_id": user_id}).sort("timestamp", -1).limit(limit)
+        conversations = await cursor.to_list(length=limit)
+        return conversations
+    except Exception as e:
+        print(f"Error retrieving conversations from {collection_name}: {e}")
+        raise
+
+
+# Create collections for conversations if they don't exist
+async def create_conversation_collections():
+    collections_to_create = [
+        "medical_conversations",
+        "diet_conversations",
+        "compounder_conversations"
+    ]
+    existing_collections = await db.list_collection_names()
+
+    for collection in collections_to_create:
+        if collection not in existing_collections:
+            await db.create_collection(collection)
+            print(f"Created collection: {collection}")
 
 
 async def close_mongo_connection():

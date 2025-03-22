@@ -1,7 +1,9 @@
 import os
 import json
+import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
+from database.mongodb import save_conversation, get_user_conversations
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +27,18 @@ async def process_medical_query(user_id, query, conversation_history=None):
         dict: Medical advice, potential diagnoses, doctor recommendations, and a list of available doctors
     """
     try:
+        # If no conversation history was provided, fetch from database
+        if not conversation_history:
+            try:
+                stored_conversations = await get_user_conversations("medical_conversations", user_id, limit=5)
+                conversation_history = []
+                for conv in stored_conversations:
+                    conversation_history.append({"role": "user", "content": conv["query"]})
+                    conversation_history.append({"role": "assistant", "content": json.dumps(conv["response"])})
+            except Exception as e:
+                print(f"Error retrieving conversation history: {e}")
+                conversation_history = []
+
         # Prepare messages for the API
         messages = [
             {"role": "system", "content": """
@@ -99,6 +113,20 @@ async def process_medical_query(user_id, query, conversation_history=None):
                 if not any(d["name"] == doctor["name"] for d in relevant_doctors):
                     doctor["relevant"] = False
 
+        # Save the conversation to the database
+        try:
+            conversation_data = {
+                "timestamp": datetime.datetime.utcnow(),
+                "query": query,
+                "response": medical_response,
+                "metadata": {
+                    "recommended_specialties": recommended_specialties
+                }
+            }
+            await save_conversation("medical_conversations", user_id, conversation_data)
+        except Exception as e:
+            print(f"Error saving conversation: {e}")
+
         # Include both the medical response and the doctor list in the return value
         return {
             "status": "success",
@@ -121,6 +149,7 @@ async def process_medical_query(user_id, query, conversation_history=None):
                 "message": f"Failed to process medical query: {str(e)}. Also failed to retrieve doctor list: {str(doc_error)}"
             }
 
+# Leave the other functions as they are
 async def save_medical_query(user_id, query, response):
     """
     Save the medical query and response to the database.

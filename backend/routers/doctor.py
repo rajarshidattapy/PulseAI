@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 # Import services
-from services.ai_doctor import process_medical_query, save_medical_query, get_doctor_list
+from services.ai_doctor import process_medical_query, get_doctor_list
+from database.mongodb import get_user_conversations
 
 router = APIRouter()
 
@@ -31,19 +32,12 @@ async def medical_query(query_data: MedicalQuery):
     """
     try:
         # Process the query with AI service
+        # We no longer need to call save_medical_query as it's handled internally
         response = await process_medical_query(
             query_data.user_id,
             query_data.query,
             query_data.conversation_history
         )
-
-        # Save to database if query processing was successful
-        if response["status"] == "success":
-            await save_medical_query(
-                query_data.user_id,
-                query_data.query,
-                response["data"]
-            )
 
         return response
     except Exception as e:
@@ -74,18 +68,30 @@ async def get_user_queries(user_id: str):
     """
     Endpoint to retrieve a user's previous medical queries and responses.
     """
-    # This would normally fetch from MongoDB
-    # For now, return placeholder data
-    return {
-        "status": "success",
-        "data": {
-            "queries": [
-                {
-                    "id": "sample_query_id_1",
-                    "timestamp": "2025-03-05T14:22:00",
-                    "query": "What could cause persistent headaches?",
-                    "response_summary": "Discussed potential causes of headaches and recommended consultation."
-                }
-            ]
+    try:
+        # Get conversation history from MongoDB
+        conversations = await get_user_conversations("medical_conversations", user_id)
+
+        # Format the conversations for the response
+        formatted_queries = []
+        for conv in conversations:
+            query_summary = {
+                "id": str(conv.get("_id")),
+                "timestamp": conv.get("timestamp").isoformat() if "timestamp" in conv else None,
+                "query": conv.get("query"),
+                "response_summary": conv.get("response", {}).get("answer", "")[:100] + "..." if conv.get(
+                    "response") else "No response"
+            }
+            formatted_queries.append(query_summary)
+
+        return {
+            "status": "success",
+            "data": {
+                "queries": formatted_queries
+            }
         }
-    }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving user queries: {str(e)}"
+        )

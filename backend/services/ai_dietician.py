@@ -1,7 +1,9 @@
 import os
 import json
+import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
+from database.mongodb import save_conversation, get_user_conversations
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +25,25 @@ async def generate_diet_plan(user_data):
         dict: Personalized diet plan and lifestyle recommendations
     """
     try:
+        # Check for past conversations to maintain context
+        user_id = user_data.get("user_id")
+        past_conversations = []
+
+        if user_id:
+            try:
+                stored_conversations = await get_user_conversations("diet_conversations", user_id, limit=3)
+                for conv in stored_conversations:
+                    # Only include relevant past diet plans in the context
+                    if "response" in conv and "daily_calories" in conv["response"]:
+                        past_conversations.append(conv["response"])
+            except Exception as e:
+                print(f"Error retrieving diet conversation history: {e}")
+
+        # Include past conversation context in the prompt if available
+        past_context = ""
+        if past_conversations:
+            past_context = "\nPrevious diet plans for this user: " + json.dumps(past_conversations)
+
         # Construct the prompt for GPT-4o
         prompt = f"""
         Generate a personalized diet plan for a {user_data.get('age')}-year-old {user_data.get('sex')} 
@@ -33,7 +54,7 @@ async def generate_diet_plan(user_data):
         - Sleep patterns: {user_data.get('sleep_hours', 'Not specified')} hours per night
         - Activity level: {user_data.get('activity_level', 'Not specified')}
         - Dietary preferences: {', '.join(user_data.get('dietary_preferences', ['None specified']))}
-        - Allergies: {', '.join(user_data.get('allergies', ['None reported']))}
+        - Allergies: {', '.join(user_data.get('allergies', ['None reported']))}{past_context}
 
         Please include:
         1. Daily calorie recommendation
@@ -65,6 +86,23 @@ async def generate_diet_plan(user_data):
         # Extract and parse the JSON response
         diet_plan = json.loads(response.choices[0].message.content)
 
+        # Save the diet plan to conversation history
+        if user_id:
+            try:
+                conversation_data = {
+                    "timestamp": datetime.datetime.utcnow(),
+                    "query": f"Diet plan request for {user_data.get('age')}-year-old {user_data.get('sex')}",
+                    "response": diet_plan,
+                    "metadata": {
+                        "health_issues": user_data.get('health_issues', []),
+                        "dietary_preferences": user_data.get('dietary_preferences', []),
+                        "allergies": user_data.get('allergies', [])
+                    }
+                }
+                await save_conversation("diet_conversations", user_id, conversation_data)
+            except Exception as e:
+                print(f"Error saving diet conversation: {e}")
+
         return {
             "status": "success",
             "data": diet_plan
@@ -87,6 +125,9 @@ async def predict_health_metrics(user_data):
         dict: Predicted health metrics and risk assessments
     """
     try:
+        # Get user ID for saving conversation
+        user_id = user_data.get("user_id")
+
         # Construct the prompt for GPT-4o
         prompt = f"""
         Based on the following health information, provide predictions about potential health metrics 
@@ -128,6 +169,22 @@ async def predict_health_metrics(user_data):
         # Extract and parse the JSON response
         health_predictions = json.loads(response.choices[0].message.content)
 
+        # Save the health predictions to conversation history
+        if user_id:
+            try:
+                conversation_data = {
+                    "timestamp": datetime.datetime.utcnow(),
+                    "query": f"Health metrics prediction for {user_data.get('age')}-year-old {user_data.get('sex')}",
+                    "response": health_predictions,
+                    "metadata": {
+                        "health_issues": user_data.get('health_issues', []),
+                        "family_history": user_data.get('family_history', {})
+                    }
+                }
+                await save_conversation("diet_conversations", user_id, conversation_data)
+            except Exception as e:
+                print(f"Error saving health metrics conversation: {e}")
+
         return {
             "status": "success",
             "data": health_predictions
@@ -150,6 +207,16 @@ async def save_diet_plan(user_id, diet_plan):
     Returns:
         str: The ID of the saved diet plan
     """
-    # In a real implementation, this would save to MongoDB
-    # For now, we'll return a placeholder
-    return "diet_plan_id_placeholder"
+    # This function is now being used primarily in the router file
+    # The conversation saving is handled in the generate_diet_plan function
+    from database.mongodb import db
+    try:
+        result = await db.diet_plans.insert_one({
+            "user_id": user_id,
+            "timestamp": datetime.datetime.utcnow(),
+            "diet_plan": diet_plan
+        })
+        return str(result.inserted_id)
+    except Exception as e:
+        print(f"Error saving diet plan: {e}")
+        return "diet_plan_id_error"

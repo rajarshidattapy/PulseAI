@@ -1,8 +1,10 @@
 import os
 import base64
 import json
+import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
+from database.mongodb import save_conversation
 
 # Load environment variables
 load_dotenv()
@@ -12,12 +14,13 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-async def analyze_medical_report(image_data):
+async def analyze_medical_report(image_data, user_id=None):
     """
     Analyze medical reports and prescriptions using OpenAI's GPT-4o.
 
     Args:
         image_data: The medical report or prescription image data
+        user_id: The ID of the user (optional)
 
     Returns:
         dict: Analysis results including summary, medications, and recommendations
@@ -58,6 +61,24 @@ async def analyze_medical_report(image_data):
         # Extract and parse the JSON response
         analysis_result = json.loads(response.choices[0].message.content)
 
+        # Save the analysis to conversation history if user_id is provided
+        if user_id:
+            try:
+                # We can't save the actual image in the conversation history,
+                # so we'll save the analysis results
+                conversation_data = {
+                    "timestamp": datetime.datetime.utcnow(),
+                    "query": "Medical report analysis request",
+                    "response": analysis_result,
+                    "metadata": {
+                        "image_analyzed": True,
+                        "image_size": len(image_data)
+                    }
+                }
+                await save_conversation("compounder_conversations", user_id, conversation_data)
+            except Exception as e:
+                print(f"Error saving medical report analysis conversation: {e}")
+
         return {
             "status": "success",
             "data": analysis_result
@@ -81,6 +102,16 @@ async def save_analysis_to_db(user_id, report_data, analysis_result):
     Returns:
         str: The ID of the saved record
     """
-    # In a real implementation, this would interact with your MongoDB
-    # For now, we'll return a placeholder
-    return "report_analysis_id_placeholder"
+    # Updated to actually save to MongoDB
+    from database.mongodb import db
+    try:
+        result = await db.medical_reports.insert_one({
+            "user_id": user_id,
+            "timestamp": datetime.datetime.utcnow(),
+            "report_data": report_data,
+            "analysis_result": analysis_result
+        })
+        return str(result.inserted_id)
+    except Exception as e:
+        print(f"Error saving analysis to db: {e}")
+        return "report_analysis_id_error"
