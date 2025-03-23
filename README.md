@@ -72,13 +72,6 @@ npm run dev
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
-```
-
-#### Blockchain
-```bash
-cd blockchain
-truffle migrate --network rinkeby
-```
 
 ---
 
