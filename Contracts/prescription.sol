@@ -3,24 +3,30 @@ pragma solidity ^0.8.18;
 
 /**
  * @title PrescriptionUpload
- * @dev Contract for storing prescription and patient details securely
+ * @dev Contract for storing prescription images, details and patient information
  */
 contract PrescriptionUpload {
     // State variables
-    mapping(address => string) private presDetails;
-    mapping(address => string) private patDetails;
+    mapping(address => string) public presImage;
+    mapping(address => string) public presDetails;
+    mapping(address => string) public patDetails;
+    
     address private owner;
     mapping(address => bool) private authorizedDoctors;
+    mapping(address => mapping(address => bool)) private patientAuthorizations;
     
     // Events
-    event PrescriptionStored(address indexed user, uint256 timestamp);
-    event PatientDetailsStored(address indexed user, uint256 timestamp);
+    event PrescriptionUploaded(address indexed patient, string ipfsHash, uint256 timestamp);
+    event PatientDetailsStored(address indexed patient, uint256 timestamp);
     event DoctorAuthorized(address indexed doctor);
     event DoctorRevoked(address indexed doctor);
+    event AccessGranted(address indexed patient, address indexed authorized);
+    event AccessRevoked(address indexed patient, address indexed revoked);
     
     // Custom errors
     error Unauthorized();
     error EmptyInput();
+    error InvalidAddress();
     
     // Constructor
     constructor() {
@@ -43,71 +49,103 @@ contract PrescriptionUpload {
         _;
     }
     
-    // Owner functions
-    function authorizeDoctors(address doctor) public onlyOwner {
-        require(doctor != address(0), "Invalid doctor address");
+    modifier validAddress(address addr) {
+        if (addr == address(0)) revert InvalidAddress();
+        _;
+    }
+    
+    // Access control functions
+    function authorizeDoctors(address doctor) public onlyOwner validAddress(doctor) {
         authorizedDoctors[doctor] = true;
         emit DoctorAuthorized(doctor);
     }
     
-    function revokeDoctors(address doctor) public onlyOwner {
+    function revokeDoctors(address doctor) public onlyOwner validAddress(doctor) {
         require(authorizedDoctors[doctor], "Doctor not authorized");
         authorizedDoctors[doctor] = false;
         emit DoctorRevoked(doctor);
     }
     
+    function grantAccess(address authorized) public validAddress(authorized) {
+        patientAuthorizations[msg.sender][authorized] = true;
+        emit AccessGranted(msg.sender, authorized);
+    }
+    
+    function revokeAccess(address authorized) public validAddress(authorized) {
+        patientAuthorizations[msg.sender][authorized] = false;
+        emit AccessRevoked(msg.sender, authorized);
+    }
+    
     // Core functions
-    function storePres(string memory _prescription) 
+    function storePres(string memory _ipfsHash, string memory _presdetails) 
         public 
         onlyAuthorized
-        nonEmptyString(_prescription) 
+        nonEmptyString(_ipfsHash)
+        nonEmptyString(_presdetails)
         returns(string memory) 
     {
-        presDetails[msg.sender] = _prescription;
-        emit PrescriptionStored(msg.sender, block.timestamp);
+        presDetails[msg.sender] = _presdetails;
+        presImage[msg.sender] = _ipfsHash;
+        emit PrescriptionUploaded(msg.sender, _ipfsHash, block.timestamp);
         return presDetails[msg.sender];
     }
     
-    function storePatDetails(string memory _patDetails) 
+    function storePatDetails(string memory _patdetails) 
         public 
-        nonEmptyString(_patDetails) 
-        returns (string memory)
+        nonEmptyString(_patdetails) 
     {
-        patDetails[msg.sender] = _patDetails;
+        patDetails[msg.sender] = _patdetails;
         emit PatientDetailsStored(msg.sender, block.timestamp);
-        return patDetails[msg.sender];
     }
     
-    // Getter functions
-    function getPrescription(address patient) 
+    // Getter functions with access control
+    function getPrescriptionDetails(address patient) 
         public 
         view 
-        onlyAuthorized 
-        returns (string memory) 
+        validAddress(patient)
+        returns (string memory, string memory) 
     {
-        return presDetails[patient];
+        require(
+            patient == msg.sender || 
+            patientAuthorizations[patient][msg.sender] || 
+            authorizedDoctors[msg.sender] || 
+            msg.sender == owner, 
+            "Unauthorized access"
+        );
+        
+        return (presImage[patient], presDetails[patient]);
     }
     
     function getPatientDetails(address patient) 
         public 
         view 
-        onlyAuthorized 
+        validAddress(patient)
         returns (string memory) 
     {
+        require(
+            patient == msg.sender || 
+            patientAuthorizations[patient][msg.sender] || 
+            authorizedDoctors[msg.sender] || 
+            msg.sender == owner, 
+            "Unauthorized access"
+        );
+        
         return patDetails[patient];
     }
     
-    function getOwnPrescription() public view returns (string memory) {
-        return presDetails[msg.sender];
-    }
-    
-    function getOwnPatientDetails() public view returns (string memory) {
-        return patDetails[msg.sender];
-    }
-    
-    // Safety function
-    function transferOwnership(address newOwner) public onlyOwner {
-        require(newOwner != address(0), "Invalid new owner address");
+    // Safety functions
+    function transferOwnership(address newOwner) public onlyOwner validAddress(newOwner) {
         owner = newOwner;
+    }
+    
+    function isDoctor(address doctor) public view returns (bool) {
+        return authorizedDoctors[doctor];
+    }
+    
+    function hasAccess(address patient, address accessor) public view returns (bool) {
+        return patient == accessor || 
+               patientAuthorizations[patient][accessor] || 
+               authorizedDoctors[accessor] || 
+               accessor == owner;
     }
 }
