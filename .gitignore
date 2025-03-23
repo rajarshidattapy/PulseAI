@@ -53,3 +53,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 node_modules/
+# Next.js build and cache files
+.next/
+node_modules/

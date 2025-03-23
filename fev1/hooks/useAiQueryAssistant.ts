@@ -6,13 +6,34 @@ interface MedicalQuery {
   conversation_history?: { role: string; content: string }[];
 }
 
+interface Doctor {
+  name: string;
+  specialty: string;
+  location: string;
+  contactInformation?: {
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
+  relevant: boolean;
+}
+
 interface MedicalResponse {
   status: string;
-  data?: any;
+  data?: {
+    answer: string;
+    possible_conditions?: string[];
+    recommendations?: string;
+    doctor_referrals?: string[];
+    precautions?: string;
+    disclaimer: string;
+  };
+  doctors?: Doctor[];
+  relevant_doctors?: Doctor[] | null;
   error?: string;
 }
 
-const API_BASE_URL = " http://127.0.0.1:8000"; 
+const API_BASE_URL = " http://127.0.0.1:8000";
 
 export function useMedicalQuery() {
   const [loading, setLoading] = useState(false);

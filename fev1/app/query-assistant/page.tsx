@@ -4,7 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMedicalQuery } from "@/hooks/useAiQueryAssistant";
-import { Heart, Search, AlertCircle, Activity, Stethoscope, Shield } from "lucide-react";
+import { Heart, Search, AlertCircle, Activity, Stethoscope, Shield, MapPin, Phone } from "lucide-react";
+
+interface Doctor {
+  name: string;
+  specialty: string;
+  location: string;
+  contactInformation?: {
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
+  relevant: boolean;
+}
 
 interface MedicalResponse {
   status: string;
@@ -15,24 +27,43 @@ interface MedicalResponse {
     doctor_referrals?: string[];
     precautions?: string;
     disclaimer: string;
-    doctors?: { name: string; Specialty: string; Location: string; Contact: string }[];
   };
+  doctors?: Doctor[];
+  relevant_doctors?: Doctor[] | null;
 }
 
 export default function HealthAssistant() {
   const [query, setQuery] = useState<string>("");
   const { response, loading, error, processMedicalQuery } = useMedicalQuery();
   const [displayResponse, setDisplayResponse] = useState<MedicalResponse["data"] | null>(null);
+  const [prescribedDoctors, setPrescribedDoctors] = useState<Doctor[]>([]);
 
   useEffect(() => {
-    if (response?.status === "success" && response.data) {
-      setDisplayResponse(response.data);
+    if (response?.status === "success") {
+      // Set the display response from data
+      if (response.data) {
+        setDisplayResponse(response.data);
+      }
+
+      // Handle doctors list from the response
+      if (response.doctors && Array.isArray(response.doctors) && response.doctors.length > 0) {
+        setPrescribedDoctors(response.doctors);
+      } else if (response.relevant_doctors && Array.isArray(response.relevant_doctors) && response.relevant_doctors.length > 0) {
+        setPrescribedDoctors(response.relevant_doctors);
+      } else {
+        setPrescribedDoctors([]);
+      }
     }
   }, [response]);
 
   const handleSubmit = async () => {
     if (!query.trim()) return;
     await processMedicalQuery({ user_id: "123", query });
+  };
+
+  // Helper function to safely get phone number
+  const getPhoneNumber = (doctor: Doctor): string => {
+    return doctor.contactInformation?.phone || "N/A";
   };
 
   return (
@@ -42,7 +73,7 @@ export default function HealthAssistant() {
           Ask any medical question and get AI-powered insights and recommendations
         </p>
       </div>
-      
+
       <div className="flex gap-2 w-full relative">
         <Input
           type="text"
@@ -52,15 +83,15 @@ export default function HealthAssistant() {
           className="pr-10 shadow-sm border-blue-100 dark:border-slate-700 focus-visible:ring-blue-400"
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
         />
-        <Button 
-          onClick={handleSubmit} 
+        <Button
+          onClick={handleSubmit}
           disabled={loading}
           className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all shadow-md"
         >
           {loading ? "Loading..." : "Ask"}
         </Button>
       </div>
-      
+
       <Card className="w-full max-w-md border-blue-100 dark:border-slate-700 shadow-lg overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2" />
         <CardContent className="p-6">
@@ -81,7 +112,7 @@ export default function HealthAssistant() {
           ) : displayResponse ? (
             <div className="space-y-4">
               <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{displayResponse.answer}</p>
-              {displayResponse.possible_conditions?.length > 0 && (
+              {displayResponse.possible_conditions && displayResponse.possible_conditions.length > 0 && (
                 <div className="space-y-2 bg-blue-50 dark:bg-slate-800/50 p-3 rounded-md">
                   <h2 className="font-semibold flex items-center gap-2 text-blue-700 dark:text-blue-400">
                     <Stethoscope className="h-5 w-5" /> Possible Conditions:
@@ -101,7 +132,7 @@ export default function HealthAssistant() {
                   <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{displayResponse.recommendations}</p>
                 </div>
               )}
-              {displayResponse.doctor_referrals?.length > 0 && (
+              {displayResponse.doctor_referrals && displayResponse.doctor_referrals.length > 0 && (
                 <div className="space-y-2">
                   <h2 className="font-semibold flex items-center gap-2 text-blue-700 dark:text-blue-400">
                     <Stethoscope className="h-5 w-5" /> Doctor Referrals:
@@ -121,17 +152,37 @@ export default function HealthAssistant() {
                   <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{displayResponse.precautions}</p>
                 </div>
               )}
+              {prescribedDoctors.length > 0 && (
+                <div className="space-y-3 bg-green-50 dark:bg-green-950/30 p-3 rounded-md">
+                  <h2 className="font-semibold flex items-center gap-2 text-green-700 dark:text-green-400">
+                    <Stethoscope className="h-5 w-5" /> Recommended Doctors:
+                  </h2>
+                  <div className="space-y-2">
+                    {prescribedDoctors.map((doctor, index) => (
+                      <div key={index} className="p-2 bg-white dark:bg-slate-800 rounded-md shadow-sm">
+                        <h3 className="font-medium text-blue-700 dark:text-blue-400">{doctor.name}</h3>
+                        <p className="text-slate-700 dark:text-slate-300 text-sm">
+                          <span className="font-medium">Specialty:</span> {doctor.specialty}
+                        </p>
+                        <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-sm mt-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>{doctor.location}</span>
+                        </div>
+                        {doctor.contactInformation?.phone && (
+                          <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 text-sm">
+                            <Phone className="h-3 w-3" />
+                            <span>{doctor.contactInformation.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="border-t pt-3 mt-4">
                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                   <strong>Disclaimer:</strong> {displayResponse.disclaimer}
                 </p>
-                <ul>
-                  {displayResponse.doctors?.map((doctor, index) => (
-                    <li key={index}>
-                      <strong>{doctor.name}</strong> - {doctor.Specialty}, {doctor.Location} ({doctor.Contact})
-                    </li>
-                  ))}
-                </ul>
               </div>
             </div>
           ) : (
