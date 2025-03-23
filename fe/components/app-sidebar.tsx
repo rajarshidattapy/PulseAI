@@ -119,7 +119,7 @@ export function AppSidebar() {
             <Brain className="h-6 w-6 text-primary" />
           </div>
           <div className="flex flex-col">
-            <span className="text-md font-semibold text-primary font-sans">Health Hub</span>
+            <span className="text-md font-semibold text-primary font-sans">Pulse</span>
             <span className="text-xs text-muted-foreground">AI-Powered Healthcare</span>
           </div>
         </div>

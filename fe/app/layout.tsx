@@ -16,7 +16,7 @@ const bricolage = Bricolage_Grotesque({
 })
 
 export const metadata: Metadata = {
-  title: "Unified AI Health Hub",
+  title: "Unified AI Pulse",
   description: "AI-powered healthcare platform for precision medicine",
 }
 

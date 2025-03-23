@@ -65,7 +65,7 @@ function DashboardContent() {
       <div className="rounded-lg border bg-card p-6">
         <h3 className="mb-4 text-xl font-semibold">System Overview</h3>
         <p className="text-muted-foreground">
-          Welcome to the Unified AI Health Hub. This platform integrates multiple AI-powered modules to enhance
+          Welcome to the Unified AI Pulse. This platform integrates multiple AI-powered modules to enhance
           healthcare delivery, research, and patient outcomes. Navigate through the sidebar to access different modules.
         </p>
       </div>

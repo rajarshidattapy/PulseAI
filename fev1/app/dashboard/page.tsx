@@ -65,7 +65,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground">
-          Welcome to the Unified AI Health Hub. View key metrics and system status.
+          Welcome to the Unified AI Pulse. View key metrics and system status.
         </p>
       </div>
 
@@ -131,7 +131,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle>System Overview</CardTitle>
-              <CardDescription>Current status and health of the AI Health Hub platform</CardDescription>
+              <CardDescription>Current status and health of the AI Pulse platform</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
