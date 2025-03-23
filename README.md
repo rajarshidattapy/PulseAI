@@ -55,7 +55,7 @@ This project aims to revolutionize healthcare through AI and blockchain technolo
 
 ### 1️⃣ Clone the Repository
 ```bash
- git clone https://github.com/your-repo/healthcare-ai.git
+ git clone https://github.com/yashdodwani/healthcare-ai.git
  cd healthcare-ai
 ```
 
