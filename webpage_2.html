@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Sync - Google Fit Connector</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #4285F4;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 {
+            margin: 0;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #4285F4;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #3367D6;
+        }
+        .btn-secondary {
+            background-color: #ddd;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background-color: #ccc;
+        }
+        .token-display {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .steps-form {
+            margin-top: 30px;
+            display: none;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .result {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Health Sync - Google Fit Connector</h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>Connect to Google Fit</h2>
+            <p>Click the button below to authorize Health Sync to access your Google Fit data.</p>
+            <button id="authorizeBtn" class="btn">Connect Google Fit</button>
+
+            <div id="tokenInfo" class="token-display" style="display: none;">
+                <h3>OAuth Tokens</h3>
+                <div id="tokenContent"></div>
+            </div>
+        </div>
+
+        <div id="stepsForm" class="card steps-form">
+            <h2>Fetch Steps Data</h2>
+            <div class="form-group">
+                <label for="userId">User ID:</label>
+                <input type="text" id="userId" placeholder="Enter your user ID" value="user123">
+            </div>
+            <div class="form-group">
+                <label for="timeRange">Time Range:</label>
+                <select id="timeRange">
+                    <option value="today">Today</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                </select>
+            </div>
+            <button id="fetchStepsBtn" class="btn">Fetch Steps Data</button>
+
+            <div id="stepsResult" class="result" style="display: none;">
+                <h3>Steps Data</h3>
+                <pre id="stepsData"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual credentials
+        const CLIENT_ID = '848641918323-9t44o0844g0621eiirucr7pqppkmo9ou.apps.googleusercontent.com';
+        const REDIRECT_URI = 'http://localhost:8000/auth/callback';
+        const SCOPE = encodeURIComponent('https://www.googleapis.com/auth/fitness.activity.read');
+        const API_ENDPOINT = 'http://localhost:8000/api/steps/get-steps';
+
+        // DOM Elements
+        const authorizeBtn = document.getElementById('authorizeBtn');
+        const tokenInfo = document.getElementById('tokenInfo');
+        const tokenContent = document.getElementById('tokenContent');
+        const stepsForm = document.getElementById('stepsForm');
+        const fetchStepsBtn = document.getElementById('fetchStepsBtn');
+        const stepsResult = document.getElementById('stepsResult');
+        const stepsData = document.getElementById('stepsData');
+
+        // Check if we have a code in the URL (after redirect)
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+
+            if (code) {
+                // Clear the URL to avoid issues on refresh
+                window.history.replaceState({}, document.title, REDIRECT_URI);
+
+                // Exchange code for access token
+                exchangeCodeForToken(code);
+            }
+
+            // Check if we have tokens in localStorage
+            if (localStorage.getItem('googleFitTokens')) {
+                displayTokens(JSON.parse(localStorage.getItem('googleFitTokens')));
+                stepsForm.style.display = 'block';
+            }
+        };
+
+        // Set up event listeners
+        authorizeBtn.addEventListener('click', authorizeGoogleFit);
+        fetchStepsBtn.addEventListener('click', fetchStepsData);
+
+        function authorizeGoogleFit() {
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                `client_id=${CLIENT_ID}&` +
+                `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+                `response_type=code&` +
+                `scope=${SCOPE}&` +
+                `access_type=offline&` +
+                `prompt=consent`;
+
+            // Open a popup window
+            const authWindow = window.open(authUrl, 'googleAuthPopup', 'width=600,height=700');
+
+            // Listen for messages from the popup
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.code) {
+                    exchangeCodeForToken(event.data.code);
+                }
+            }, false);
+        }
+
+        // Function to exchange authorization code for tokens
+        async function exchangeCodeForToken(code) {
+            try {
+                const response = await fetch('http://localhost:8000/api/steps/exchange-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Token exchange response:', result);
+
+                if (result.status === 'error') {
+                    console.error('Token exchange error:', result.message);
+                    alert('Failed to connect to Google Fit: ' + result.message);
+                    return;
+                }
+
+                const data = result.data;
+
+                // Store tokens
+                const tokens = {
+                    access_token: data.access_token,
+                    refresh_token: data.refresh_token,
+                    expires_at: data.expires_at
+                };
+
+                localStorage.setItem('googleFitTokens', JSON.stringify(tokens));
+                displayTokens(tokens);
+                stepsForm.style.display = 'block';
+            } catch (error) {
+                console.error('Error exchanging code for token:', error);
+                alert('Failed to connect to Google Fit: ' + error.message);
+            }
+        }
+
+        // Display tokens on the page
+        function displayTokens(tokens) {
+            tokenContent.textContent = JSON.stringify(tokens, null, 2);
+            tokenInfo.style.display = 'block';
+        }
+
+        // Fetch steps data from the API
+        async function fetchStepsData() {
+            const tokens = JSON.parse(localStorage.getItem('googleFitTokens'));
+            if (!tokens) {
+                alert('Please connect to Google Fit first');
+                return;
+            }
+
+            const userId = document.getElementById('userId').value;
+            const timeRange = document.getElementById('timeRange').value;
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        token_info: tokens,
+                        time_range: timeRange
+                    })
+                });
+
+                const data = await response.json();
+                stepsData.textContent = JSON.stringify(data, null, 2);
+                stepsResult.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error fetching steps data:', error);
+                alert('Failed to fetch steps data. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>
