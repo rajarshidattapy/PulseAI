@@ -50,9 +50,9 @@ const mainModules = [
     path: "/care-plans",
   },
   {
-    title: "GYM TRAINER AI",
-    icon: ClipboardList,
-    path: "/gymtrainer",
+    title: "Gym Trainer AI",
+    icon: BarChart3,
+    path: "/webpage.html",
   },
   {
     title: "GET FIT COINS",
@@ -89,14 +89,12 @@ export function AppSidebar() {
                     isActive={pathname === module.path}
                     className="group transition-all duration-200 hover:bg-primary/10 data-[active=true]:bg-primary/15 data-[active=true]:text-primary"
                   >
-                    <Link
-                      href={module.path || module.href || '#'}
-                      target={module.href ? "_blank" : undefined}
-                      rel={module.href ? "noopener noreferrer" : undefined}
-                    >
-                      <module.icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110 data-[active=true]:text-primary" />
-                      <span>{module.title}</span>
-                    </Link>
+                    <a href={module.path || module.href || '#'} target={module.href ? "_blank" : undefined} rel="noopener noreferrer">
+                    <module.icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110 data-[active=true]:text-primary" />
+                    <span>{module.title}</span>
+                    </a>
+
+
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
