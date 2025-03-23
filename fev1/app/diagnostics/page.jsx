@@ -52,11 +52,11 @@ export default function DiagnosticsPage() {
       });
       return;
     }
-  
+
     const userId = "123"; // Replace with actual user ID logic
     setUploadState("uploading");
     setProgress(0);
-  
+
     try {
       processMedicalReport(selectedFile, userId);
       setUploadState("complete");
@@ -67,9 +67,9 @@ export default function DiagnosticsPage() {
       });
     }
   };
-  
 
-  
+
+
   return (
     <div className="space-y-6 w-[975px]">
       <div className="flex flex-col gap-2">
@@ -116,19 +116,26 @@ export default function DiagnosticsPage() {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setImagePreview(null);
-                }}
-                disabled={!selectedFile}
-              >
-                Reset
-              </Button>
-              <Button disabled={!selectedFile || uploadState !== "idle"} onClick={handleFileUpload}>
-                Upload
+            <CardFooter className="flex flex-col gap-2">
+              <div className="flex justify-between w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setImagePreview(null);
+                  }}
+                  disabled={!selectedFile}
+                >
+                  Reset
+                </Button>
+                <Button disabled={!selectedFile || uploadState !== "idle"} onClick={handleFileUpload}>
+                  Upload
+                </Button>
+              </div>
+              <Button variant="outline" className="w-full bg-white hover:bg-gray-50" asChild>
+                <a href="https://v0-solidity-frontend-integration.vercel.app/patient" target="_blank" rel="noopener noreferrer">
+                  Add Prescription to Blockchain
+                </a>
               </Button>
             </CardFooter>
           </Card>

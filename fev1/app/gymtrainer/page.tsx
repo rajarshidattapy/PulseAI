@@ -50,30 +50,46 @@ export default function GymTrainerPage() {
   }, [stream])
 
   const initWebcam = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-      })
-
-      if (webcamRef.current) {
-        webcamRef.current.srcObject = mediaStream
-      }
-
-      setStream(mediaStream)
-      setWebcamConnected(true)
-      return true
-    } catch (error) {
-      console.error("Error accessing webcam:", error)
-      toast.error("Webcam Error", {
-        description: "Could not access your camera. Please check permissions.",
-      })
-      return false
-    }
+  // First make sure the video element is rendered
+  if (!webcamRef.current) {
+    console.error("Video element not available yet");
+    toast.error("Webcam Error", {
+      description: "Video element not ready. Please try again.",
+    });
+    return false;
   }
+
+  try {
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: "user",
+      },
+    });
+
+    console.log("Got media stream:", mediaStream);
+
+    // Now we know webcamRef.current exists
+    webcamRef.current.srcObject = mediaStream;
+
+    // Make sure the video plays
+    webcamRef.current.onloadedmetadata = () => {
+      webcamRef.current?.play()
+        .catch(err => console.error("Error playing video:", err));
+    };
+
+    setStream(mediaStream);
+    setWebcamConnected(true);
+    return true;
+  } catch (error) {
+    console.error("Error accessing webcam:", error);
+    toast.error("Webcam Error", {
+      description: "Could not access your camera. Please check permissions.",
+    });
+    return false;
+  }
+};
 
   const captureFrame = () => {
     if (!webcamRef.current) return null
